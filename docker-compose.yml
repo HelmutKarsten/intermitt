@@ -1,0 +1,25 @@
+version: "3.9"
+services:
+  api:
+    container_name: intermitt_api
+    build: ./api
+    network_mode: host
+    environment:
+      REDIS_HOST: "redis"
+      REDIS_PASSWORD: "top-secret"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api/:/code
+    depends_on: 
+      - "redis"
+
+  redis:
+    container_name: intermitt_redis
+    network_mode: host
+    image: redis
+    environment:
+      TZ: "Europe/Berlin"
+    command: ["redis-server", "--save",  "--requirepass", "top-secret"]
+    ports:
+      - "6379:6379"
