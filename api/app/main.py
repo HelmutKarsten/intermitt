@@ -1,5 +1,6 @@
 from typing import Union, Optional
 
+from fastapi.exceptions import HTTPException
 from fastapi import FastAPI
 
 import aioredis
@@ -10,6 +11,7 @@ from .utils import (
     get_date,
     get_last_entry_keys,
     create_new_state,
+    _entry_already_exists,
 )
 
 from pydantic import BaseModel
@@ -17,6 +19,12 @@ from pydantic import BaseModel
 
 class WeightEntry(BaseModel):
     weight: float
+
+
+class LogEntry(BaseModel):
+    date: str
+    start: str
+    end: str
 
 
 class State(BaseModel):
@@ -57,7 +65,7 @@ async def begin_fast():
     return state
 
 
-@app.post("/toggle")
+@app.get("/toggle")
 async def toggle_fast():
     state = await get_state(redis)
     if state["state"] == "eat":
@@ -100,9 +108,6 @@ async def read_weights():
 @app.delete("/state")
 async def delete_state():
     await redis.delete("state")
-    await redis.delete("2022-05-28")
-    await redis.delete("2022-05-27")
-    await redis.delete("w_2022-05-27")
     return "deleted"
 
 
@@ -113,9 +118,12 @@ async def create_state(state: Optional[State]):
 
 
 @app.post("/set_log")
-async def set_log():
+async def set_log(entry: LogEntry):
+    key_exists = await redis.exists(entry.date)
+    if key_exists:
+        raise HTTPException(status_code=400, detail="Log for this date already exists.")
     result = await redis.set(
-        "2022-05-28",
-        str({"date": "2022-05-28", "start": "11:52:00", "end": "17:21:45"}),
+        entry.date,
+        str({"date": entry.date, "start": entry.start, "end": entry.end}),
     )
     return {"data": result, "msg": "New state created."}
